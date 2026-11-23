@@ -1,0 +1,20 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Build and unit tests only. CI-built APKs are signed with the runner's key,
+# which is not registered with HUAWEI, so they cannot read HUAWEI data.
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-37.2"
+      - run: ./gradlew testDebugUnitTest lintDebug assembleDebug --console=plain

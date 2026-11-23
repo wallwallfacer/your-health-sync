@@ -33,9 +33,10 @@ Its password is in the macOS Keychain: `security find-generic-password -s yourhe
 1. Open HUAWEI Developers console → **Development** → **Health Service Kit** (it may be listed as "Health Kit") → **Apply**.
 2. Select the app created in Step 1.
 3. Request **read** access only, for these data scopes:
-   - **Height and weight** (read)
-   - **Body fat** / body composition (read). It covers body fat rate, BMI, muscle, water, bone, protein and skeletal muscle.
-   - **Historical data** (read data from before the authorization date), if the form offers it. Pick the longest range offered.
+   - **Height and weight** (read). SDK scope: `https://www.huawei.com/healthkit/heightweight.read`
+   - **Body fat** (read). It covers body fat rate, BMI, muscle, water, bone, protein and skeletal muscle. SDK scope: `https://www.huawei.com/healthkit/bodyfat.read`
+   - **Historical data, 1 year**. SDK scope: `https://www.huawei.com/healthkit/historydata.open.year` (the longest the SDK offers)
+   These are the exact scopes the app requests (checked against HMS Health SDK 6.16.0.300).
 4. **Check:** the scope names in the form may differ from the words above. Pick the ones whose descriptions match.
    Do not request write scopes or other data types (steps, sleep, heart rate).
 5. Purpose / description text you can paste:
