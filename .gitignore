@@ -1,0 +1,23 @@
+# Gradle / Android
+.gradle/
+build/
+/local.properties
+/captures
+*.apk
+*.aab
+.externalNativeBuild/
+.cxx/
+
+# Secrets: never commit
+*.jks
+*.keystore
+agconnect-services.json
+keystore.properties
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Agent-local settings
+.claude/settings.local.json
