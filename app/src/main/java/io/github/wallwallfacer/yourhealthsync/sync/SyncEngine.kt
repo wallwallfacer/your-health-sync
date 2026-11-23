@@ -16,7 +16,8 @@ fun interface BodySink {
 
 data class TimeWindow(val startMillis: Long, val endMillis: Long)
 
-data class SyncResult(val written: Int, val failedWindows: List<TimeWindow>)
+/** [firstError] is the first failure's "Type: message", shown to the user; null when nothing failed. */
+data class SyncResult(val written: Int, val failedWindows: List<TimeWindow>, val firstError: String? = null)
 
 /**
  * Copies samples from [source] to [sink] window by window.
@@ -41,6 +42,7 @@ class SyncEngine(
     private suspend fun sync(startMillis: Long, endMillis: Long): SyncResult {
         var written = 0
         val failed = mutableListOf<TimeWindow>()
+        var firstError: String? = null
         for (window in chunks(startMillis, endMillis)) {
             try {
                 val samples = source.read(window.startMillis, window.endMillis)
@@ -49,9 +51,10 @@ class SyncEngine(
                 throw e
             } catch (e: Exception) {
                 failed += window
+                if (firstError == null) firstError = "${e::class.simpleName}: ${e.message}"
             }
         }
-        return SyncResult(written, failed)
+        return SyncResult(written, failed, firstError)
     }
 
     private fun chunks(startMillis: Long, endMillis: Long): List<TimeWindow> =

@@ -19,8 +19,13 @@ object HuaweiAuth {
     fun requestIntent(activity: Activity): Intent =
         HuaweiHiHealth.getSettingController(activity).requestAuthorizationIntent(scopes, true)
 
-    fun isSuccess(activity: Activity, data: Intent?): Boolean =
-        data != null && HuaweiHiHealth.getSettingController(activity).parseHealthKitAuthResultFromIntent(data)?.isSuccess == true
+    /** Null on success, otherwise a message for the user that includes Huawei's error code. */
+    fun errorOf(activity: Activity, data: Intent?): String? {
+        if (data == null) return "Huawei authorization was cancelled"
+        val result = HuaweiHiHealth.getSettingController(activity).parseHealthKitAuthResultFromIntent(data)
+            ?: return "Huawei returned no authorization result"
+        return if (result.isSuccess) null else "Huawei authorization failed (error code ${result.errorCode})"
+    }
 
     /** Withdraws every scope this app holds. */
     suspend fun revoke(context: Context) {

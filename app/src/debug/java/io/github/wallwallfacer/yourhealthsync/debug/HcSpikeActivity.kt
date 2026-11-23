@@ -51,7 +51,7 @@ class HcSpikeActivity : ComponentActivity() {
                     Text("Health Connect spike", style = MaterialTheme.typography.headlineSmall)
                     Metric.entries.forEach { metric ->
                         var text by values.getValue(metric)
-                        OutlinedTextField(text, { text = it }, label = { Text(metric.name) }, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(text, { text = it }, label = { Text(label(metric)) }, modifier = Modifier.fillMaxWidth())
                     }
                     Button(onClick = { permissions.launch(HealthConnectSink.PERMISSIONS) }) { Text("Grant Health Connect access") }
                     Button(onClick = ::write) { Text("Write now + 60-day-old weight") }
@@ -59,6 +59,14 @@ class HcSpikeActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun label(metric: Metric) = when (metric) {
+        Metric.WEIGHT -> "Weight (kg)"
+        Metric.BODY_FAT -> "Body fat (%)"
+        Metric.BASAL_METABOLIC_RATE -> "Basal metabolic rate (kcal/day)"
+        Metric.BONE_MASS -> "Bone mass (kg)"
+        Metric.BODY_WATER_MASS -> "Body water mass (kg)"
     }
 
     private fun write() {
@@ -71,7 +79,7 @@ class HcSpikeActivity : ComponentActivity() {
         lifecycleScope.launch {
             message = try {
                 val n = HealthConnectSink(this@HcSpikeActivity).write(samples + listOfNotNull(old))
-                "Wrote $n records. Now check the Health Connect app and Samsung Health."
+                "Wrote $n records. Check the Health Connect app and Samsung Health. Afterwards delete the 60-day-old test weight."
             } catch (e: Exception) {
                 "Write failed: ${e.message}"
             }

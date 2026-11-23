@@ -106,3 +106,9 @@ Lean body mass is not derived (my call: we don't write a value the scale never m
 - Deletions in Huawei are not propagated to Health Connect (the sync only adds and updates).
 - No writes back to Huawei, and no other data types (steps, sleep, heart rate).
 - No Play Store or F-Droid listing for now.
+
+## Implementation notes (deviations from the approved design)
+- Sync status is kept in SharedPreferences instead of DataStore, because it is three values.
+- Backfill is capped at one year: `HEALTHKIT_HISTORYDATA_OPEN_YEAR` is the longest history scope in HMS Health SDK 6.16.0.300.
+- Huawei data types are read one at a time (weight, body fat rate), so a missing body-fat scope doesn't block weight.
+- All code was written before the first device check (no phone was connected). Steps 3 and 5 still need to run on the phone.

@@ -37,7 +37,7 @@ class MainActivity : ComponentActivity() {
     private var busy by mutableStateOf(false)
 
     private val huaweiAuth = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        message = if (HuaweiAuth.isSuccess(this, it.data)) "Huawei Health connected" else "Huawei authorization failed or was cancelled"
+        message = HuaweiAuth.errorOf(this, it.data) ?: "HUAWEI Health connected"
     }
 
     private val hcPermissions = registerForActivityResult(PermissionController.createRequestPermissionResultContract()) {
@@ -68,7 +68,7 @@ class MainActivity : ComponentActivity() {
         ) {
             Text("Your Health Sync", style = MaterialTheme.typography.headlineSmall)
             Text("Copies weight and body composition from HUAWEI Health to Health Connect.")
-            Button(onClick = { huaweiAuth.launch(HuaweiAuth.requestIntent(this@MainActivity)) }, Modifier.fillMaxWidth()) {
+            Button(onClick = ::connectHuawei, Modifier.fillMaxWidth()) {
                 Text("1. Connect HUAWEI Health")
             }
             Button(onClick = ::requestHealthConnect, Modifier.fillMaxWidth()) { Text("2. Allow Health Connect") }
@@ -89,6 +89,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun connectHuawei() {
+        try {
+            huaweiAuth.launch(HuaweiAuth.requestIntent(this))
+        } catch (e: Exception) {
+            message = "Cannot open HUAWEI authorization. Is HMS Core installed and up to date? (${e.message})"
+        }
+    }
+
     private fun requestHealthConnect() {
         if (!HealthConnectSink.isAvailable(this)) {
             message = "Health Connect is not available on this phone"
@@ -105,7 +113,7 @@ class MainActivity : ComponentActivity() {
                 val result = block()
                 SyncStatus.save(this@MainActivity, result)
                 if (result.failedWindows.isEmpty()) "Wrote ${result.written} records"
-                else "Wrote ${result.written} records; ${result.failedWindows.size} window(s) failed. Check Huawei authorization."
+                else "Wrote ${result.written} records; ${result.failedWindows.size} window(s) failed: ${result.firstError}"
             } catch (e: Exception) {
                 "Sync failed: ${e.message}"
             }

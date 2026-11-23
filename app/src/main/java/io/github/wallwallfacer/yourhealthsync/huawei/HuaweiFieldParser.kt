@@ -18,7 +18,7 @@ object HuaweiFieldParser {
     )
 
     fun parse(epochMillis: Long, fields: Map<String, Double>): List<BodySample> =
-        fields.mapNotNull { (name, value) ->
+        if (epochMillis <= 0) emptyList() else fields.mapNotNull { (name, value) ->
             metricByField[name]?.let { BodySample(it, epochMillis, value) }
         }
 }

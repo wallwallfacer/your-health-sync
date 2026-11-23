@@ -49,7 +49,7 @@ class SyncEngineTest {
 
         assertEquals(listOf(TimeWindow(now - 30 * day, now)), source.windows)
         assertEquals(listOf(weight(now - 2 * day)), sink.written)
-        assertEquals(SyncResult(written = 1, failedWindows = emptyList()), result)
+        assertEquals(SyncResult(written = 1, failedWindows = emptyList(), firstError = null), result)
     }
 
     @Test
@@ -86,7 +86,17 @@ class SyncEngineTest {
     fun aFailingWriteCountsAsAFailedWindow() = runTest {
         val result = SyncEngine(FakeSource(listOf(weight(now - day))), FakeSink(fail = true)) { now }.syncRecent()
 
-        assertEquals(SyncResult(written = 0, failedWindows = listOf(TimeWindow(now - 30 * day, now))), result)
+        assertEquals(listOf(TimeWindow(now - 30 * day, now)), result.failedWindows)
+        assertEquals(0, result.written)
+    }
+
+    @Test
+    fun theFirstErrorMessageIsKeptForTheUser() = runTest {
+        val source = FakeSource { _, _ -> true }
+
+        val result = SyncEngine(source, FakeSink()) { now }.backfill(fromMillis = now - 75 * day)
+
+        assertEquals("IllegalStateException: huawei read failed", result.firstError)
     }
 
     @Test

@@ -38,6 +38,11 @@ class HuaweiFieldParserTest {
     }
 
     @Test
+    fun samplesWithoutAValidTimestampAreDropped() {
+        assertEquals(emptyList<BodySample>(), HuaweiFieldParser.parse(0L, mapOf("body_weight" to 72.4)))
+    }
+
+    @Test
     fun weightOnlyReadingFromManualEntryGivesOnlyWeight() {
         assertEquals(listOf(BodySample(Metric.WEIGHT, t, 80.0)), HuaweiFieldParser.parse(t, mapOf("body_weight" to 80.0)))
     }
