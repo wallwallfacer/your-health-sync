@@ -1,6 +1,7 @@
 package io.github.wallwallfacer.yourhealthsync.settings
 
 import android.content.Context
+import androidx.core.content.edit
 import io.github.wallwallfacer.yourhealthsync.model.Metric
 
 /** What the user chose in setup: which data types to sync, and whether setup is done. */
@@ -17,20 +18,20 @@ object AppSettings {
     }
 
     fun setEnabledMetrics(context: Context, metrics: Set<Metric>) {
-        prefs(context).edit().putStringSet(ENABLED, metrics.map { it.id }.toSet()).apply()
+        prefs(context).edit { putStringSet(ENABLED, metrics.map { it.id }.toSet()) }
     }
 
     fun isSetupDone(context: Context): Boolean = prefs(context).getBoolean(SETUP_DONE, false)
 
     fun setSetupDone(context: Context, done: Boolean) {
-        prefs(context).edit().putBoolean(SETUP_DONE, done).apply()
+        prefs(context).edit { putBoolean(SETUP_DONE, done) }
     }
 
     /** Set when HUAWEI's consent screen succeeds, cleared on revoke. HMS offers no cheap way to ask. */
     fun isHuaweiConnected(context: Context): Boolean = prefs(context).getBoolean(HUAWEI_CONNECTED, false)
 
     fun setHuaweiConnected(context: Context, connected: Boolean) {
-        prefs(context).edit().putBoolean(HUAWEI_CONNECTED, connected).apply()
+        prefs(context).edit { putBoolean(HUAWEI_CONNECTED, connected) }
     }
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

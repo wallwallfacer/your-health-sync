@@ -2,6 +2,8 @@
 
 Status: approved 2026-11-23. Extends [2026-11-23-huawei-to-health-connect-design.md](2026-11-23-huawei-to-health-connect-design.md).
 
+> **Scope change (2026-11-23, during implementation):** the CSV source was dropped; only the UI redesign shipped, with HUAWEI Health as the single source. The wizard is source → destination → data types, and the dashboard has no "Import CSV" action. The CSV parser and import code from the first implementation commit is still in the tree but is not wired to any screen.
+
 ## Context
 Today the app has one source (HUAWEI Health Kit) and one flat screen of numbered buttons. Health Kit needs Huawei's scope review (10–15 working days), so the app can't be used yet. The user wants:
 1. **The Health Sync app's flow** (structure only, our own Material 3 visuals): pick a source, pick the destination, toggle data types, then a dashboard with one row per type.

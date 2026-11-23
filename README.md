@@ -18,13 +18,14 @@ BMI, visceral fat, muscle mass and similar values are not copied, because Health
 
 ## How it syncs
 - Every 6 hours (and when you tap **Sync now**) it re-reads the last 30 days and upserts them. Re-reading never creates duplicates.
-- **Backfill history** imports up to one year back (HUAWEI Health Kit's history limit).
+- **Backfill last year** (in the ⋮ menu) imports up to one year back (HUAWEI Health Kit's history limit).
+- Each data type can be switched off on the home screen; switched-off types are not written.
 - One way only: nothing is written back to HUAWEI. Deleting a weigh-in in HUAWEI Health does not delete it in Health Connect.
 
 ## Install (Samsung or any Android phone)
 1. Install **AppGallery**, then **HMS Core** from AppGallery, then **HUAWEI Health**, and sign in.
 2. Download the APK from [Releases](https://github.com/wallwallfacer/your-health-sync/releases) and install it.
-3. Open the app: tap **Connect HUAWEI Health**, then **Allow Health Connect**, then **Sync now**.
+3. Open the app and follow the three setup steps: **source** (tap **Connect HUAWEI Health**), **destination** (tap **Allow access** for Health Connect) and **data types**. Then tap **Sync now** on the home screen, which shows the latest synced value per data type.
 4. In Samsung Health: **Settings → Health Connect → App permissions**. Allow Samsung Health to read body composition data.
 
 > HUAWEI approves Health Kit access for one specific signed app. Only the official release APK can read HUAWEI data. A build you make yourself cannot, until you register your own app (see below).

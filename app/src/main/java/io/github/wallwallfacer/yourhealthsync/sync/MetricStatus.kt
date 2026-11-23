@@ -1,6 +1,7 @@
 package io.github.wallwallfacer.yourhealthsync.sync
 
 import android.content.Context
+import androidx.core.content.edit
 import io.github.wallwallfacer.yourhealthsync.model.BodySample
 import io.github.wallwallfacer.yourhealthsync.model.Metric
 
@@ -19,7 +20,7 @@ object MetricStatus {
 
     fun save(context: Context, result: SyncResult, now: Long = System.currentTimeMillis()) {
         val latest = merge(latest(context), result.latest)
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().apply {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
             putLong("run_at", now)
             putInt("run_written", result.written)
             putInt("run_failed", result.failedWindows.size)
@@ -28,7 +29,7 @@ object MetricStatus {
                 putLong("t_${metric.id}", s.epochMillis)
                 putString("v_${metric.id}", s.value.toString())
             }
-        }.apply()
+        }
     }
 
     fun latest(context: Context): Map<Metric, BodySample> {
