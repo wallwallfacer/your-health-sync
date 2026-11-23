@@ -78,6 +78,13 @@ Lean body mass is not derived (my call: we don't write a value the scale never m
    - (b) Whether the 60-day-old record reaches Samsung. Health Connect limits a reading app to roughly 30 days before its permission grant. If it doesn't arrive, backfill only fills Health Connect, and the README says so.
    - (c) Delete one record in Health Connect and see whether Samsung drops its copy.
    If Samsung reads nothing, stop and re-plan.
+
+   **Result (2026-11-23, Galaxy SM-S9380, China CSC, Samsung Health 7.1.3.006).** The spike wrote mock values (77.7 kg, 22.2 %, 1555 kcal, 3.3 kg, 44.4 kg), plus a 77.7 kg weight dated 60 days back.
+   - Health Connect stored all 6 records with this app as the source, including the 60-day-old one.
+   - Samsung Health holds Health Connect read permission for weight, body fat, BMR and height, but not for bone mass or body water.
+   - **Samsung Health never read anything.** For about 15 minutes, including opening and force-restarting Samsung Health, Health Connect's "Recent access" listed only this app's write. Samsung Health showed no new entry. It had also never written to Health Connect: Health Connect held no data before the test. Its settings have no Health Connect entry. Likely cause (not confirmed): the China build of Samsung Health does not sync with Health Connect.
+   - So the Samsung side of (a), and all of (b) and (c), stay untested on this phone. This is the "Samsung reads nothing" case: re-plan before relying on Health Connect → Samsung Health.
+   - The test data was removed with Health Connect's "Delete app data". Samsung Health never imported it. The spike screen has been removed from the code.
 4. TDD: `RecordMapper`, then `SyncEngine` with fakes.
 5. **Thin Huawei slice:** auth, a one-window read and a manual Sync now. Run it on the device as soon as the test scopes are active. This is the first check that HMS on Samsung works.
 6. Then the full composition, the worker, backfill, revoke, privacy link, README and CI. Commit.

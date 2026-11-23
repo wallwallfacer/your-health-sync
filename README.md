@@ -50,8 +50,6 @@ YHS_KEYSTORE_PASSWORD="$(security find-generic-password -s yourhealthsync-releas
 ./gradlew assembleRelease
 ```
 
-Debug builds also include an **HC spike** launcher entry. It writes test values to Health Connect so you can check what Samsung Health shows, without HUAWEI access.
-
 ## Privacy
 No server, no analytics. See [PRIVACY.md](PRIVACY.md).
 
