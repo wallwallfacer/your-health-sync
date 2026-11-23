@@ -18,7 +18,7 @@ BMI, visceral fat, muscle mass and similar values are not copied, because Health
 
 ## How it syncs
 - Every 6 hours (and when you tap **Sync now**) it re-reads the last 30 days and upserts them. Re-reading never creates duplicates.
-- **Backfill last year** (in the ⋮ menu) imports up to one year back (HUAWEI Health Kit's history limit).
+- **Backfill history (last year)** (in the ⋮ menu) imports up to one year back (HUAWEI Health Kit's history limit).
 - Each data type can be switched off on the home screen; switched-off types are not written.
 - One way only: nothing is written back to HUAWEI. Deleting a weigh-in in HUAWEI Health does not delete it in Health Connect.
 

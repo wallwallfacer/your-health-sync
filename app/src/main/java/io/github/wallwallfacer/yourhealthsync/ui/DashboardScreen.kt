@@ -131,9 +131,9 @@ private fun OverflowMenu(ui: UiState, actions: UiActions) {
         IconButton(onClick = { open = true }) { Text("⋮", style = MaterialTheme.typography.titleLarge) }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             listOf(
-                Triple("Backfill last year", !ui.busy, actions::backfill),
+                Triple("Backfill history (last year)", !ui.busy, actions::backfill),
                 Triple(if (ui.huaweiConnected) "Reconnect HUAWEI Health" else "Connect HUAWEI Health", true, actions::connectHuawei),
-                Triple("Revoke HUAWEI access", true, actions::revokeHuawei),
+                Triple("Revoke HUAWEI Health access", true, actions::revokeHuawei),
                 Triple("Health Connect settings", true, actions::openHealthConnectSettings),
                 Triple("Run setup again", true, actions::runSetupAgain),
                 Triple("Privacy statement", true, actions::openPrivacy),

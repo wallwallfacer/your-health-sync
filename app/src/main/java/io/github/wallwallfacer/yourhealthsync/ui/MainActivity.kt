@@ -93,10 +93,10 @@ class MainActivity : ComponentActivity(), UiActions {
 
     private fun nextStep() {
         when (step) {
-            // Step 3 starts with the types Health Connect allowed, when it allowed any.
-            1 -> if (ui.granted.isNotEmpty()) {
-                AppSettings.setEnabledMetrics(this, ui.granted)
-                ui = ui.copy(enabled = ui.granted)
+            1 -> {
+                val types = SetupRules.typesForDataStep(ui.enabled, ui.granted)
+                AppSettings.setEnabledMetrics(this, types)
+                ui = ui.copy(enabled = types)
             }
             WIZARD_STEPS - 1 -> {
                 AppSettings.setSetupDone(this, true)
