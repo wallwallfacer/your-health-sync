@@ -27,36 +27,52 @@ class SyncEngineTest {
         }
     }
 
-    private class FakeSink(private val fail: Boolean = false) : BodySink {
+    private class FakeSink(private val failWhen: (List<BodySample>) -> Boolean = { false }) : BodySink {
         val written = mutableListOf<BodySample>()
-        var calls = 0
-        override suspend fun write(samples: List<BodySample>): Int {
-            calls++
-            if (fail) throw IllegalStateException("health connect write failed")
+        val batches = mutableListOf<List<BodySample>>()
+        val versions = mutableListOf<Long>()
+        override suspend fun write(samples: List<BodySample>, version: Long): Int {
+            batches += samples
+            versions += version
+            if (failWhen(samples)) throw IllegalStateException("health connect write failed")
             written += samples
             return samples.size
         }
     }
 
-    private fun weight(at: Long) = BodySample(Metric.WEIGHT, at, 70.0)
+    private fun weight(at: Long, kg: Double = 70.0) = BodySample(Metric.WEIGHT, at, kg)
+    private fun fat(at: Long) = BodySample(Metric.BODY_FAT, at, 20.0)
+    private fun engine(sink: BodySink, metrics: Set<Metric> = Metric.entries.toSet(), chunkSize: Int = 1000) =
+        SyncEngine(sink, now = { now }, metrics = { metrics }, chunkSize = chunkSize)
 
     @Test
     fun syncRecentReadsTheTrailingThirtyDaysAndWritesWhatItFinds() = runTest {
         val source = FakeSource(listOf(weight(now - 2 * day), weight(now - 40 * day)))
         val sink = FakeSink()
 
-        val result = SyncEngine(source, sink) { now }.syncRecent()
+        val result = engine(sink).syncRecent(source)
 
         assertEquals(listOf(TimeWindow(now - 30 * day, now)), source.windows)
         assertEquals(listOf(weight(now - 2 * day)), sink.written)
-        assertEquals(SyncResult(written = 1, failedWindows = emptyList(), firstError = null), result)
+        assertEquals(1, result.written)
+        assertEquals(emptyList<TimeWindow>(), result.failedWindows)
+        assertEquals(null, result.firstError)
+    }
+
+    @Test
+    fun syncWritesWithTheMappingVersion() = runTest {
+        val sink = FakeSink()
+
+        engine(sink).syncRecent(FakeSource(listOf(weight(now - day))))
+
+        assertEquals(listOf(RecordMapper.MAPPING_VERSION), sink.versions)
     }
 
     @Test
     fun backfillSplitsTheRangeIntoContiguousChunksOfAtMostThirtyDays() = runTest {
         val source = FakeSource()
 
-        SyncEngine(source, FakeSink()) { now }.backfill(fromMillis = now - 75 * day)
+        engine(FakeSink()).backfill(source, fromMillis = now - 75 * day)
 
         val windows = source.windows
         assertEquals(3, windows.size)
@@ -74,7 +90,7 @@ class SyncEngineTest {
         val source = FakeSource(listOf(old, recent)) { start, end -> failingStart in start until end }
         val sink = FakeSink()
 
-        val result = SyncEngine(source, sink) { now }.backfill(fromMillis = now - 75 * day)
+        val result = engine(sink).backfill(source, fromMillis = now - 75 * day)
 
         assertEquals(listOf(old, recent), sink.written)
         assertEquals(2, result.written)
@@ -84,7 +100,7 @@ class SyncEngineTest {
 
     @Test
     fun aFailingWriteCountsAsAFailedWindow() = runTest {
-        val result = SyncEngine(FakeSource(listOf(weight(now - day))), FakeSink(fail = true)) { now }.syncRecent()
+        val result = engine(FakeSink { true }).syncRecent(FakeSource(listOf(weight(now - day))))
 
         assertEquals(listOf(TimeWindow(now - 30 * day, now)), result.failedWindows)
         assertEquals(0, result.written)
@@ -92,9 +108,7 @@ class SyncEngineTest {
 
     @Test
     fun theFirstErrorMessageIsKeptForTheUser() = runTest {
-        val source = FakeSource { _, _ -> true }
-
-        val result = SyncEngine(source, FakeSink()) { now }.backfill(fromMillis = now - 75 * day)
+        val result = engine(FakeSink()).backfill(FakeSource { _, _ -> true }, fromMillis = now - 75 * day)
 
         assertEquals("IllegalStateException: huawei read failed", result.firstError)
     }
@@ -103,22 +117,71 @@ class SyncEngineTest {
     fun emptyWindowsDoNotCallTheSink() = runTest {
         val sink = FakeSink()
 
-        SyncEngine(FakeSource(), sink) { now }.syncRecent()
+        engine(sink).syncRecent(FakeSource())
 
-        assertEquals(0, sink.calls)
+        assertEquals(0, sink.batches.size)
     }
 
     @Test
     fun cancellationIsNotSwallowedAsAFailedWindow() = runTest {
-        val source = object : BodySource {
-            override suspend fun read(startMillis: Long, endMillis: Long): List<BodySample> =
-                throw CancellationException("cancelled")
-        }
+        val source = BodySource { _, _ -> throw CancellationException("cancelled") }
         try {
-            SyncEngine(source, FakeSink()) { now }.syncRecent()
+            engine(FakeSink()).syncRecent(source)
             fail("expected CancellationException")
         } catch (expected: CancellationException) {
             // ok
         }
+    }
+
+    @Test
+    fun onlyAllowedMetricsAreWritten() = runTest {
+        val sink = FakeSink()
+
+        engine(sink, metrics = setOf(Metric.WEIGHT)).syncRecent(FakeSource(listOf(weight(now - day), fat(now - day))))
+
+        assertEquals(listOf(weight(now - day)), sink.written)
+    }
+
+    @Test
+    fun implausibleValuesAreCountedAsSkippedAndNotSentToTheSink() = runTest {
+        val sink = FakeSink()
+
+        val result = engine(sink).import(listOf(weight(now - day), weight(now - 2 * day, kg = 0.0)))
+
+        assertEquals(listOf(weight(now - day)), sink.written)
+        assertEquals(1, result.written)
+        assertEquals(1, result.skipped)
+    }
+
+    @Test
+    fun importWritesInChunksWithTheImportTimeAsVersion() = runTest {
+        val sink = FakeSink()
+        val samples = (1..5).map { weight(now - it * day) }
+
+        val result = engine(sink, chunkSize = 2).import(samples)
+
+        assertEquals(listOf(2, 2, 1), sink.batches.map { it.size })
+        assertEquals(listOf(now, now, now), sink.versions)
+        assertEquals(5, result.written)
+    }
+
+    @Test
+    fun aFailingImportChunkIsReportedAndTheOthersStillWrite() = runTest {
+        val bad = weight(now - 3 * day)
+        val sink = FakeSink { bad in it }
+        val samples = (1..5).map { weight(now - it * day) }
+
+        val result = engine(sink, chunkSize = 2).import(samples)
+
+        assertEquals(3, result.written)
+        assertEquals(1, result.failedWindows.size)
+        assertEquals("IllegalStateException: health connect write failed", result.firstError)
+    }
+
+    @Test
+    fun latestHoldsTheNewestWrittenSamplePerMetric() = runTest {
+        val result = engine(FakeSink()).import(listOf(weight(now - 2 * day, 71.0), weight(now - day, 72.0), fat(now - 5 * day)))
+
+        assertEquals(mapOf(Metric.WEIGHT to weight(now - day, 72.0), Metric.BODY_FAT to fat(now - 5 * day)), result.latest)
     }
 }

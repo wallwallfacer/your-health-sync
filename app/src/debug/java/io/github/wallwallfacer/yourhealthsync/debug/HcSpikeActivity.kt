@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.lifecycleScope
 import io.github.wallwallfacer.yourhealthsync.hc.HealthConnectSink
+import io.github.wallwallfacer.yourhealthsync.sync.RecordMapper
 import io.github.wallwallfacer.yourhealthsync.model.BodySample
 import io.github.wallwallfacer.yourhealthsync.model.Metric
 import java.util.concurrent.TimeUnit
@@ -78,7 +79,7 @@ class HcSpikeActivity : ComponentActivity() {
         val old = weight?.copy(epochMillis = now - TimeUnit.DAYS.toMillis(60))
         lifecycleScope.launch {
             message = try {
-                val n = HealthConnectSink(this@HcSpikeActivity).write(samples + listOfNotNull(old))
+                val n = HealthConnectSink(this@HcSpikeActivity).write(samples + listOfNotNull(old), RecordMapper.MAPPING_VERSION)
                 "Wrote $n records. Check the Health Connect app and Samsung Health. Afterwards delete the 60-day-old test weight."
             } catch (e: Exception) {
                 "Write failed: ${e.message}"

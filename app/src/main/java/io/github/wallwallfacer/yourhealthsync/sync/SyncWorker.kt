@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit
 class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         if (!HealthConnectSink.hasPermissions(applicationContext)) return Result.failure()
-        val result = Syncer.engine(applicationContext).syncRecent()
+        val result = Syncer.engine(applicationContext).syncRecent(HuaweiBodySource(applicationContext))
         SyncStatus.save(applicationContext, result)
         return if (result.failedWindows.isEmpty()) Result.success() else Result.retry()
     }
@@ -34,9 +34,12 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
     }
 }
 
-/** Wires the production source and sink. */
+/** Wires the production sink and the metrics it may write. HMS is touched only by the source a caller passes in. */
 object Syncer {
-    fun engine(context: Context) = SyncEngine(HuaweiBodySource(context), HealthConnectSink(context))
+    fun engine(context: Context) = SyncEngine(
+        HealthConnectSink(context),
+        metrics = { HealthConnectSink.grantedMetrics(context) },
+    )
 }
 
 /** Last sync outcome, shown in the UI. */

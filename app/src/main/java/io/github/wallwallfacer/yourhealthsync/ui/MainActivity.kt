@@ -23,7 +23,9 @@ import androidx.compose.ui.unit.dp
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.lifecycleScope
 import io.github.wallwallfacer.yourhealthsync.hc.HealthConnectSink
+import io.github.wallwallfacer.yourhealthsync.csv.CsvImport
 import io.github.wallwallfacer.yourhealthsync.huawei.HuaweiAuth
+import io.github.wallwallfacer.yourhealthsync.huawei.HuaweiBodySource
 import io.github.wallwallfacer.yourhealthsync.sync.SyncResult
 import io.github.wallwallfacer.yourhealthsync.sync.SyncStatus
 import io.github.wallwallfacer.yourhealthsync.sync.SyncWorker
@@ -43,6 +45,24 @@ class MainActivity : ComponentActivity() {
     private val hcPermissions = registerForActivityResult(PermissionController.createRequestPermissionResultContract()) {
         message = if (it.containsAll(HealthConnectSink.PERMISSIONS)) "Health Connect access granted" else "Health Connect access incomplete"
         if (it.containsAll(HealthConnectSink.PERMISSIONS)) SyncWorker.schedule(this)
+    }
+
+    // Temporary entry point for the CSV device check; replaced by the dashboard.
+    private val pickCsv = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@registerForActivityResult
+        busy = true
+        message = "Importing…"
+        lifecycleScope.launch {
+            message = try {
+                val outcome = CsvImport.run(this@MainActivity, uri)
+                SyncStatus.save(this@MainActivity, outcome.result)
+                outcome.summary
+            } catch (e: Exception) {
+                "Import failed: ${e.message}"
+            }
+            status = SyncStatus.describe(this@MainActivity)
+            busy = false
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -72,14 +92,17 @@ class MainActivity : ComponentActivity() {
                 Text("1. Connect HUAWEI Health")
             }
             Button(onClick = ::requestHealthConnect, Modifier.fillMaxWidth()) { Text("2. Allow Health Connect") }
-            Button(onClick = { launchSync { Syncer.engine(this@MainActivity).syncRecent() } }, Modifier.fillMaxWidth(), enabled = !busy) {
+            Button(onClick = { launchSync { Syncer.engine(this@MainActivity).syncRecent(HuaweiBodySource(this@MainActivity)) } }, Modifier.fillMaxWidth(), enabled = !busy) {
                 Text("Sync now (last 30 days)")
             }
             OutlinedButton(
-                onClick = { launchSync { Syncer.engine(this@MainActivity).backfill(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(365)) } },
+                onClick = { launchSync { Syncer.engine(this@MainActivity).backfill(HuaweiBodySource(this@MainActivity), System.currentTimeMillis() - TimeUnit.DAYS.toMillis(365)) } },
                 Modifier.fillMaxWidth(),
                 enabled = !busy,
             ) { Text("Backfill history (last year)") }
+            OutlinedButton(onClick = { pickCsv.launch(CsvImport.MIME_TYPES) }, Modifier.fillMaxWidth(), enabled = !busy) {
+                Text("Import CSV file")
+            }
             Text(status)
             if (message.isNotEmpty()) Text(message, color = MaterialTheme.colorScheme.primary)
             OutlinedButton(onClick = ::revokeHuawei, Modifier.fillMaxWidth()) { Text("Revoke HUAWEI Health access") }

@@ -19,26 +19,36 @@ import java.time.ZoneId
 /** Pure mapping from [BodySample] to Health Connect records. */
 object RecordMapper {
     /**
-     * Written as clientRecordVersion. Bump it whenever the mapping changes so
-     * Health Connect overwrites records written by an older mapping.
+     * clientRecordVersion of records read from HUAWEI Health Kit. Health Connect
+     * overwrites a record only when the new version is higher, so bump this
+     * whenever the mapping changes. CSV imports use the import time instead,
+     * so a corrected file overwrites what an earlier import wrote.
      */
     const val MAPPING_VERSION = 1L
 
     private val scale = Device(type = Device.TYPE_SCALE)
 
-    fun clientRecordId(sample: BodySample): String = "huawei:${sample.metric.id}:${sample.epochMillis}"
+    /**
+     * Independent of the source and rounded down to the minute, so the same
+     * weigh-in arriving from a CSV file and from HUAWEI Health Kit upserts one record.
+     */
+    fun clientRecordId(sample: BodySample): String =
+        "body:${sample.metric.id}:${sample.epochMillis - Math.floorMod(sample.epochMillis, MINUTE_MILLIS)}"
+
+    fun isPlausible(sample: BodySample): Boolean =
+        sample.value.isFinite() && sample.value > 0.0 && sample.value <= maxValue(sample.metric)
 
     /** Returns null for values that are not plausible measurements. */
-    fun toRecord(sample: BodySample, zone: ZoneId): Record? {
+    fun toRecord(sample: BodySample, zone: ZoneId, version: Long): Record? {
+        if (!isPlausible(sample)) return null
         val v = sample.value
-        if (!v.isFinite() || v <= 0.0 || v > maxValue(sample.metric)) return null
 
         val time = Instant.ofEpochMilli(sample.epochMillis)
         val offset = zone.rules.getOffset(time)
         val metadata = Metadata.autoRecorded(
             device = scale,
             clientRecordId = clientRecordId(sample),
-            clientRecordVersion = MAPPING_VERSION,
+            clientRecordVersion = version,
         )
         return when (sample.metric) {
             Metric.WEIGHT -> WeightRecord(time, offset, Mass.kilograms(v), metadata)
@@ -49,6 +59,8 @@ object RecordMapper {
             Metric.BODY_WATER_MASS -> BodyWaterMassRecord(time, offset, Mass.kilograms(v), metadata)
         }
     }
+
+    private const val MINUTE_MILLIS = 60_000L
 
     // Upper bounds match Health Connect's own validation limits.
     private fun maxValue(metric: Metric): Double = when (metric) {
