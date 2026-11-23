@@ -15,6 +15,6 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - uses: android-actions/setup-android@v3
-      - run: sdkmanager "platforms;android-37.2"
+      # The runner image ships the Android SDK; only add the platform this build needs.
+      - run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.2" > /dev/null
       - run: ./gradlew testDebugUnitTest lintDebug assembleDebug --console=plain

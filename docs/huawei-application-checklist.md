@@ -41,7 +41,7 @@ Its password is in the macOS Keychain: `security find-generic-password -s yourhe
    Do not request write scopes or other data types (steps, sleep, heart rate).
 5. Purpose / description text you can paste:
    > Personal, open-source app that copies the user's own weight and body-composition measurements from HUAWEI Health to Android Health Connect on the same phone, so they appear in other health apps. Data never leaves the device; there is no server.
-6. Privacy statement URL: `http://xingchendahai.in/your-health-sync/PRIVACY` (GitHub Pages, already live).
+6. Privacy statement URL: `https://github.com/wallwallfacer/your-health-sync/blob/main/PRIVACY.md` (already public).
 7. Submit.
 
 ## Step 3: Check the result
