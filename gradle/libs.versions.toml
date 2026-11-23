@@ -1,0 +1,25 @@
+[versions]
+agp = "9.5.2"
+kotlin = "2.4.21"
+composeBom = "2026.11.01"
+activityCompose = "1.13.0"
+healthConnect = "1.1.0"
+huaweiHealth = "6.16.0.300"
+work = "2.12.0"
+coroutines = "1.10.2"
+junit = "4.13.2"
+
+[libraries]
+androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+androidx-health-connect = { group = "androidx.health.connect", name = "connect-client", version.ref = "healthConnect" }
+androidx-work-runtime = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }
+huawei-health = { group = "com.huawei.hms", name = "health", version.ref = "huaweiHealth" }
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
