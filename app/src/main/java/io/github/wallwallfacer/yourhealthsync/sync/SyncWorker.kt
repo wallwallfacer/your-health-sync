@@ -44,26 +44,3 @@ object Syncer {
 
     fun engine(context: Context) = SyncEngine(HealthConnectSink(context), metrics = { allowedMetrics(context) })
 }
-
-/** Last sync outcome, shown in the UI. */
-object SyncStatus {
-    private const val PREFS = "sync-status"
-
-    fun save(context: Context, result: SyncResult) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putLong("at", System.currentTimeMillis())
-            .putInt("written", result.written)
-            .putInt("failed", result.failedWindows.size)
-            .apply()
-    }
-
-    fun describe(context: Context): String {
-        val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val at = p.getLong("at", 0L)
-        if (at == 0L) return "Never synced"
-        val failed = p.getInt("failed", 0)
-        val time = java.text.DateFormat.getDateTimeInstance().format(java.util.Date(at))
-        return "Last sync: $time, ${p.getInt("written", 0)} records" +
-            if (failed > 0) ", $failed window(s) failed" else ""
-    }
-}

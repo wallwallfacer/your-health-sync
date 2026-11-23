@@ -3,11 +3,13 @@ package io.github.wallwallfacer.yourhealthsync.ui
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -18,13 +20,16 @@ import androidx.compose.ui.unit.dp
  */
 class PrivacyActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
-                Text(
-                    PRIVACY_TEXT,
-                    Modifier.safeDrawingPadding().padding(16.dp).verticalScroll(rememberScrollState()),
-                )
+            AppTheme {
+                Surface(Modifier.fillMaxSize()) {
+                    Text(
+                        PRIVACY_TEXT,
+                        Modifier.safeDrawingPadding().padding(16.dp).verticalScroll(rememberScrollState()),
+                    )
+                }
             }
         }
     }

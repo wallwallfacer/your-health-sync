@@ -8,6 +8,7 @@ object AppSettings {
     private const val PREFS = "settings"
     private const val ENABLED = "enabled_metrics"
     private const val SETUP_DONE = "setup_done"
+    private const val HUAWEI_CONNECTED = "huawei_connected"
 
     /** All types are on until the user turns some off. */
     fun enabledMetrics(context: Context): Set<Metric> {
@@ -23,6 +24,13 @@ object AppSettings {
 
     fun setSetupDone(context: Context, done: Boolean) {
         prefs(context).edit().putBoolean(SETUP_DONE, done).apply()
+    }
+
+    /** Set when HUAWEI's consent screen succeeds, cleared on revoke. HMS offers no cheap way to ask. */
+    fun isHuaweiConnected(context: Context): Boolean = prefs(context).getBoolean(HUAWEI_CONNECTED, false)
+
+    fun setHuaweiConnected(context: Context, connected: Boolean) {
+        prefs(context).edit().putBoolean(HUAWEI_CONNECTED, connected).apply()
     }
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

@@ -1,158 +1,192 @@
 package io.github.wallwallfacer.yourhealthsync.ui
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.lifecycleScope
 import io.github.wallwallfacer.yourhealthsync.hc.HealthConnectSink
-import io.github.wallwallfacer.yourhealthsync.csv.CsvImport
 import io.github.wallwallfacer.yourhealthsync.huawei.HuaweiAuth
 import io.github.wallwallfacer.yourhealthsync.huawei.HuaweiBodySource
+import io.github.wallwallfacer.yourhealthsync.model.Metric
+import io.github.wallwallfacer.yourhealthsync.settings.AppSettings
+import io.github.wallwallfacer.yourhealthsync.sync.MetricStatus
 import io.github.wallwallfacer.yourhealthsync.sync.SyncResult
-import io.github.wallwallfacer.yourhealthsync.sync.SyncStatus
 import io.github.wallwallfacer.yourhealthsync.sync.SyncWorker
 import io.github.wallwallfacer.yourhealthsync.sync.Syncer
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.launch
 
-class MainActivity : ComponentActivity() {
-    private var message by mutableStateOf("")
-    private var status by mutableStateOf("")
-    private var busy by mutableStateOf(false)
+/** Hosts the first-run wizard and, once setup is done, the dashboard. */
+class MainActivity : ComponentActivity(), UiActions {
+    private var ui by mutableStateOf(UiState())
+    private var setupDone by mutableStateOf(false)
+    private var step by mutableIntStateOf(0)
 
     private val huaweiAuth = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        message = HuaweiAuth.errorOf(this, it.data) ?: "HUAWEI Health connected"
+        val error = HuaweiAuth.errorOf(this, it.data)
+        if (error == null) AppSettings.setHuaweiConnected(this, true)
+        refresh(message = error ?: "HUAWEI Health connected")
     }
 
-    private val hcPermissions = registerForActivityResult(PermissionController.createRequestPermissionResultContract()) {
-        message = if (it.containsAll(HealthConnectSink.PERMISSIONS)) "Health Connect access granted" else "Health Connect access incomplete"
-        if (it.containsAll(HealthConnectSink.PERMISSIONS)) SyncWorker.schedule(this)
-    }
+    /** Remembers what was asked for, to tell a denial from a granted request. */
+    private var requested: Set<Metric> = emptySet()
 
-    // Temporary entry point for the CSV device check; replaced by the dashboard.
-    private val pickCsv = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri == null) return@registerForActivityResult
-        busy = true
-        message = "Importing…"
-        lifecycleScope.launch {
-            message = try {
-                val outcome = CsvImport.run(this@MainActivity, uri)
-                SyncStatus.save(this@MainActivity, outcome.result)
-                outcome.summary
-            } catch (e: Exception) {
-                "Import failed: ${e.message}"
-            }
-            status = SyncStatus.describe(this@MainActivity)
-            busy = false
-        }
+    private val hcPermissions = registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { granted ->
+        val missing = requested.filter { HealthConnectSink.permissionOf(it) !in granted }
+        refresh(
+            message = if (missing.isEmpty()) "Health Connect access allowed"
+            else "Not allowed: ${missing.joinToString { MetricFormat.label(it) }}. Use Health Connect settings in the menu to allow it.",
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        setContent { MaterialTheme { Screen() } }
+        setupDone = AppSettings.isSetupDone(this)
+        setContent {
+            AppTheme {
+                if (setupDone) {
+                    DashboardScreen(ui, this)
+                } else {
+                    BackHandler(enabled = step > 0) { step-- }
+                    WizardScreen(step, ui, this, onBack = { step-- }, onNext = ::nextStep)
+                }
+            }
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        status = SyncStatus.describe(this)
+        refresh()
+    }
+
+    /** Reloads state from settings and Health Connect, and keeps the periodic sync scheduled. */
+    private fun refresh(message: String? = ui.message) {
+        val available = HealthConnectSink.isAvailable(this)
         lifecycleScope.launch {
-            if (HealthConnectSink.isAvailable(this@MainActivity) && HealthConnectSink.hasPermissions(this@MainActivity)) {
-                SyncWorker.schedule(this@MainActivity)
-            }
+            val granted = if (available) HealthConnectSink.grantedMetrics(this@MainActivity) else emptySet()
+            ui = ui.copy(
+                huaweiConnected = AppSettings.isHuaweiConnected(this@MainActivity),
+                healthConnectAvailable = available,
+                granted = granted,
+                enabled = AppSettings.enabledMetrics(this@MainActivity),
+                latest = MetricStatus.latest(this@MainActivity),
+                lastRun = MetricStatus.lastRun(this@MainActivity),
+                message = message,
+            )
+            if (setupDone && (ui.enabled intersect granted).isNotEmpty()) SyncWorker.schedule(this@MainActivity)
         }
     }
 
-    @androidx.compose.runtime.Composable
-    private fun Screen() {
-        Column(
-            Modifier.safeDrawingPadding().padding(16.dp).fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text("Your Health Sync", style = MaterialTheme.typography.headlineSmall)
-            Text("Copies weight and body composition from HUAWEI Health to Health Connect.")
-            Button(onClick = ::connectHuawei, Modifier.fillMaxWidth()) {
-                Text("1. Connect HUAWEI Health")
+    private fun nextStep() {
+        when (step) {
+            // Step 3 starts with the types Health Connect allowed, when it allowed any.
+            1 -> if (ui.granted.isNotEmpty()) {
+                AppSettings.setEnabledMetrics(this, ui.granted)
+                ui = ui.copy(enabled = ui.granted)
             }
-            Button(onClick = ::requestHealthConnect, Modifier.fillMaxWidth()) { Text("2. Allow Health Connect") }
-            Button(onClick = { launchSync { Syncer.engine(this@MainActivity).syncRecent(HuaweiBodySource(this@MainActivity)) } }, Modifier.fillMaxWidth(), enabled = !busy) {
-                Text("Sync now (last 30 days)")
-            }
-            OutlinedButton(
-                onClick = { launchSync { Syncer.engine(this@MainActivity).backfill(HuaweiBodySource(this@MainActivity), System.currentTimeMillis() - TimeUnit.DAYS.toMillis(365)) } },
-                Modifier.fillMaxWidth(),
-                enabled = !busy,
-            ) { Text("Backfill history (last year)") }
-            OutlinedButton(onClick = { pickCsv.launch(CsvImport.MIME_TYPES) }, Modifier.fillMaxWidth(), enabled = !busy) {
-                Text("Import CSV file")
-            }
-            Text(status)
-            if (message.isNotEmpty()) Text(message, color = MaterialTheme.colorScheme.primary)
-            OutlinedButton(onClick = ::revokeHuawei, Modifier.fillMaxWidth()) { Text("Revoke HUAWEI Health access") }
-            TextButton(onClick = { startActivity(Intent(this@MainActivity, PrivacyActivity::class.java)) }) {
-                Text("Privacy statement")
+            WIZARD_STEPS - 1 -> {
+                AppSettings.setSetupDone(this, true)
+                setupDone = true
             }
         }
+        if (step < WIZARD_STEPS - 1) step++
+        refresh(message = null)
     }
 
-    private fun connectHuawei() {
+    override fun connectHuawei() {
         try {
             huaweiAuth.launch(HuaweiAuth.requestIntent(this))
         } catch (e: Exception) {
-            message = "Cannot open HUAWEI authorization. Is HMS Core installed and up to date? (${e.message})"
+            ui = ui.copy(message = "Cannot open HUAWEI authorization. Is HMS Core installed and up to date? (${e.message})")
         }
     }
 
-    private fun requestHealthConnect() {
-        if (!HealthConnectSink.isAvailable(this)) {
-            message = "Health Connect is not available on this phone"
-            return
-        }
-        hcPermissions.launch(HealthConnectSink.PERMISSIONS)
-    }
-
-    private fun launchSync(block: suspend () -> SyncResult) {
-        busy = true
-        message = "Syncing…"
+    override fun revokeHuawei() {
         lifecycleScope.launch {
-            message = try {
-                val result = block()
-                SyncStatus.save(this@MainActivity, result)
-                if (result.failedWindows.isEmpty()) "Wrote ${result.written} records"
-                else "Wrote ${result.written} records; ${result.failedWindows.size} window(s) failed: ${result.firstError}"
-            } catch (e: Exception) {
-                "Sync failed: ${e.message}"
-            }
-            status = SyncStatus.describe(this@MainActivity)
-            busy = false
-        }
-    }
-
-    private fun revokeHuawei() {
-        lifecycleScope.launch {
-            message = try {
+            val message = try {
                 HuaweiAuth.revoke(this@MainActivity)
+                AppSettings.setHuaweiConnected(this@MainActivity, false)
                 "HUAWEI Health access revoked"
             } catch (e: Exception) {
                 "Revoke failed: ${e.message}"
             }
+            refresh(message)
         }
     }
+
+    override fun allowHealthConnect() = requestHealthConnect(Metric.entries.toSet())
+
+    private fun requestHealthConnect(metrics: Set<Metric>) {
+        if (!HealthConnectSink.isAvailable(this)) {
+            ui = ui.copy(message = "Health Connect is not available on this phone")
+            return
+        }
+        requested = metrics
+        hcPermissions.launch(HealthConnectSink.permissionsFor(metrics))
+    }
+
+    override fun openHealthConnectSettings() {
+        try {
+            startActivity(Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS))
+        } catch (e: ActivityNotFoundException) {
+            ui = ui.copy(message = "Health Connect settings are not available on this phone")
+        }
+    }
+
+    override fun setEnabled(metric: Metric, enabled: Boolean) {
+        val metrics = if (enabled) ui.enabled + metric else ui.enabled - metric
+        AppSettings.setEnabledMetrics(this, metrics)
+        ui = ui.copy(enabled = metrics)
+        if (enabled && metric !in ui.granted) requestHealthConnect(setOf(metric))
+    }
+
+    override fun syncNow() = launchSync { Syncer.engine(this).syncRecent(HuaweiBodySource(this)) }
+
+    override fun backfill() = launchSync {
+        Syncer.engine(this).backfill(HuaweiBodySource(this), System.currentTimeMillis() - TimeUnit.DAYS.toMillis(365))
+    }
+
+    override fun runSetupAgain() {
+        step = 0
+        setupDone = false
+        AppSettings.setSetupDone(this, false)
+        refresh(message = null)
+    }
+
+    override fun openPrivacy() {
+        startActivity(Intent(this, PrivacyActivity::class.java))
+    }
+
+    private fun launchSync(block: suspend () -> SyncResult) {
+        ui = ui.copy(busy = true, message = null)
+        lifecycleScope.launch {
+            val message = try {
+                val result = block()
+                MetricStatus.save(this@MainActivity, result)
+                describe(result)
+            } catch (e: Exception) {
+                "Sync failed: ${e.message}"
+            }
+            ui = ui.copy(busy = false)
+            refresh(message)
+        }
+    }
+
+    private fun describe(result: SyncResult): String = buildList {
+        add("Synced ${result.written} records")
+        if (result.skipped > 0) add("${result.skipped} implausible values skipped")
+        if (result.failedWindows.isNotEmpty()) add("${result.failedWindows.size} window(s) failed: ${result.firstError}")
+    }.joinToString(" · ")
 }
