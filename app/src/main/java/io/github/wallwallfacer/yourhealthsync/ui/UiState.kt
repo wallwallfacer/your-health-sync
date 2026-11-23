@@ -14,6 +14,8 @@ data class UiState(
     val lastRun: LastRun = LastRun(0L, 0, 0, null),
     val busy: Boolean = false,
     val message: String? = null,
+    /** Shows [message] in the error color. */
+    val messageIsError: Boolean = false,
 )
 
 /** Actions the screens can ask for; MainActivity carries them out. */

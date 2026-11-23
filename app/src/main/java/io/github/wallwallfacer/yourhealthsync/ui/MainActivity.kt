@@ -36,7 +36,7 @@ class MainActivity : ComponentActivity(), UiActions {
     private val huaweiAuth = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         val error = HuaweiAuth.errorOf(this, it.data)
         if (error == null) AppSettings.setHuaweiConnected(this, true)
-        refresh(message = error ?: "HUAWEI Health connected")
+        refresh(message = error ?: "HUAWEI Health connected", isError = error != null)
     }
 
     /** Remembers what was asked for, to tell a denial from a granted request. */
@@ -47,6 +47,7 @@ class MainActivity : ComponentActivity(), UiActions {
         refresh(
             message = if (missing.isEmpty()) "Health Connect access allowed"
             else "Not allowed: ${missing.joinToString { MetricFormat.label(it) }}. Use Health Connect settings in the menu to allow it.",
+            isError = missing.isNotEmpty(),
         )
     }
 
@@ -72,7 +73,7 @@ class MainActivity : ComponentActivity(), UiActions {
     }
 
     /** Reloads state from settings and Health Connect, and keeps the periodic sync scheduled. */
-    private fun refresh(message: String? = ui.message) {
+    private fun refresh(message: String? = ui.message, isError: Boolean = message != null && message == ui.message && ui.messageIsError) {
         val available = HealthConnectSink.isAvailable(this)
         lifecycleScope.launch {
             val granted = if (available) HealthConnectSink.grantedMetrics(this@MainActivity) else emptySet()
@@ -84,6 +85,7 @@ class MainActivity : ComponentActivity(), UiActions {
                 latest = MetricStatus.latest(this@MainActivity),
                 lastRun = MetricStatus.lastRun(this@MainActivity),
                 message = message,
+                messageIsError = isError,
             )
             if (setupDone && (ui.enabled intersect granted).isNotEmpty()) SyncWorker.schedule(this@MainActivity)
         }
@@ -109,20 +111,19 @@ class MainActivity : ComponentActivity(), UiActions {
         try {
             huaweiAuth.launch(HuaweiAuth.requestIntent(this))
         } catch (e: Exception) {
-            ui = ui.copy(message = "Cannot open HUAWEI authorization. Is HMS Core installed and up to date? (${e.message})")
+            ui = ui.copy(message = "Cannot open HUAWEI authorization. Is HMS Core installed and up to date? (${e.message})", messageIsError = true)
         }
     }
 
     override fun revokeHuawei() {
         lifecycleScope.launch {
-            val message = try {
+            try {
                 HuaweiAuth.revoke(this@MainActivity)
                 AppSettings.setHuaweiConnected(this@MainActivity, false)
-                "HUAWEI Health access revoked"
+                refresh("HUAWEI Health access revoked")
             } catch (e: Exception) {
-                "Revoke failed: ${e.message}"
+                refresh("Revoke failed: ${e.message}", isError = true)
             }
-            refresh(message)
         }
     }
 
@@ -130,7 +131,7 @@ class MainActivity : ComponentActivity(), UiActions {
 
     private fun requestHealthConnect(metrics: Set<Metric>) {
         if (!HealthConnectSink.isAvailable(this)) {
-            ui = ui.copy(message = "Health Connect is not available on this phone")
+            ui = ui.copy(message = "Health Connect is not available on this phone", messageIsError = true)
             return
         }
         requested = metrics
@@ -141,7 +142,7 @@ class MainActivity : ComponentActivity(), UiActions {
         try {
             startActivity(Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS))
         } catch (e: ActivityNotFoundException) {
-            ui = ui.copy(message = "Health Connect settings are not available on this phone")
+            ui = ui.copy(message = "Health Connect settings are not available on this phone", messageIsError = true)
         }
     }
 
@@ -172,15 +173,15 @@ class MainActivity : ComponentActivity(), UiActions {
     private fun launchSync(block: suspend () -> SyncResult) {
         ui = ui.copy(busy = true, message = null)
         lifecycleScope.launch {
-            val message = try {
+            try {
                 val result = block()
                 MetricStatus.save(this@MainActivity, result)
-                describe(result)
+                ui = ui.copy(busy = false)
+                refresh(describe(result), isError = result.failedWindows.isNotEmpty())
             } catch (e: Exception) {
-                "Sync failed: ${e.message}"
+                ui = ui.copy(busy = false)
+                refresh("Sync failed: ${e.message}", isError = true)
             }
-            ui = ui.copy(busy = false)
-            refresh(message)
         }
     }
 

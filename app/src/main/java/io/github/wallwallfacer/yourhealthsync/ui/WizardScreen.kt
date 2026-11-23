@@ -87,7 +87,7 @@ private fun ColumnScope.SourceStep(ui: UiState, actions: UiActions) {
         else Button(onClick = actions::connectHuawei) { Text("Connect HUAWEI Health") }
     }
     Hint("Needs HMS Core and HUAWEI Health on this phone. Only the official release build can read HUAWEI data.")
-    ui.message?.let { Message(it) }
+    ui.message?.let { Message(it, ui.messageIsError) }
     TextButton(onClick = actions::openPrivacy) { Text("Privacy statement") }
 }
 
@@ -105,7 +105,7 @@ private fun ColumnScope.DestinationStep(ui: UiState, actions: UiActions) {
     ) {
         Button(onClick = actions::allowHealthConnect, enabled = ui.healthConnectAvailable) { Text("Allow access") }
     }
-    ui.message?.let { Message(it) }
+    ui.message?.let { Message(it, ui.messageIsError) }
 }
 
 @Composable
@@ -157,6 +157,10 @@ fun Hint(text: String) {
 }
 
 @Composable
-fun Message(text: String) {
-    Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+fun Message(text: String, isError: Boolean = false) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+    )
 }

@@ -49,7 +49,7 @@ fun DashboardScreen(ui: UiState, actions: UiActions) {
         },
         bottomBar = {
             Column(Modifier.navigationBarsPadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                ui.message?.let { Message(it) }
+                ui.message?.let { Message(it, ui.messageIsError) }
                 Button(onClick = actions::syncNow, enabled = !ui.busy, modifier = Modifier.fillMaxWidth()) {
                     Text(if (ui.busy) "Syncing…" else "Sync now")
                 }
@@ -89,8 +89,9 @@ private fun RouteCard(ui: UiState, actions: UiActions) {
                 style = MaterialTheme.typography.bodyMedium,
             )
             if (!ui.huaweiConnected) {
-                TextButton(onClick = actions::connectHuawei, contentPadding = PaddingValues(0.dp)) {
-                    Text("HUAWEI Health is not connected. Connect")
+                Text("HUAWEI Health is not connected", style = MaterialTheme.typography.bodyMedium)
+                Button(onClick = actions::connectHuawei, modifier = Modifier.padding(top = 4.dp)) {
+                    Text("Connect HUAWEI Health")
                 }
             }
         }
